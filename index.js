@@ -29,41 +29,47 @@ exports.informOthers = functions.https.onRequest((request, response) => {
         let message = request.query.message || "no caption added"
         let members = room.members
         members.map(element => {
-             if (element.phone !== request.query.sender_phone) {
-            admin.database().ref(`notifications_tokens/${element.phone}`).once('value', snap => {
-                let token = snap.val()
-                //console.log(token)
-                let ref = admin.database().ref(`new_message/${element.phone}/${request.query.room_key}`)
-                ref.once('value', snapValue => {
-                    if (snapValue.val() === null) {
-                        ref.set({ new_messages: [request.query.message_key] })
-                    } else {
-                        ref.set({ new_messages: [...snapValue.val().new_messages, request.query.message_key] });
-                    }
-                    if(token){
-                        const payload = {
-                            notification: {
-                                title: "New " + addMessageTyeToNofication(request.query.message_type) + " from " +
-                                    request.query.room_name + "@" +
-                                    request.query.activity_name,
-                                body: message,
-                            },
-                            data: {
-                                "room_key": request.query.room_key,
-                                "type": "new_message_activity",
-                                "activity_id":request.query.activity_id
-                            }
-                        }
-                        admin.messaging().sendToDevice(token, payload).then((status) => {
-                            console.log(status)
-                            return true
-                        }).catch(error => {
-                            console.log(error)
+            let phone = request.query.sender_phone.replace(" ","+")
+            if (element.phone !== phone) {
+                admin.database().ref(`current_room/${element.phone}`).once('value', snapshoot => {
+                    let current_room = snapshoot.val()
+                    if (current_room !== request.query.room_key) {
+                        admin.database().ref(`notifications_tokens/${element.phone}`).once('value', snap => {
+                            let token = snap.val()
+                            //console.log(token)
+                            let ref = admin.database().ref(`new_message/${element.phone}/${request.query.room_key}`)
+                            ref.once('value', snapValue => {
+                                if (snapValue.val() === null) {
+                                    ref.set({ new_messages: [request.query.message_key] })
+                                } else {
+                                    ref.set({ new_messages: [...snapValue.val().new_messages, request.query.message_key] });
+                                }
+                                if (token) {
+                                    const payload = {
+                                        notification: {
+                                            title: "New " + addMessageTyeToNofication(request.query.message_type) + " from " +
+                                                request.query.room_name + "@" +
+                                                request.query.activity_name,
+                                            body: message,
+                                        },
+                                        data: {
+                                            "room_key": request.query.room_key,
+                                            "type": "new_message_activity",
+                                            "activity_id": request.query.activity_id
+                                        }
+                                    }
+                                    admin.messaging().sendToDevice(token, payload).then((status) => {
+                                        console.log(status)
+                                        return true
+                                    }).catch(error => {
+                                        console.log(error)
+                                    })
+                                }
+                            })
                         })
+                        return "ok"
                     }
                 })
-            })
-            return "ok"
             }
         })
     })
