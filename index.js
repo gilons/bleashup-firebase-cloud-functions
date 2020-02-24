@@ -58,7 +58,7 @@ exports.informOthers = functions.https.onRequest((request, response) => {
                                                     },
                                                     data: {
                                                         "room_key": request.query.room_key,
-                                                        "type": "new_message_activity",
+                                                        "type": request.query.room_type === "relation" ? "new_relation_message" : "new_message_activity",
                                                         "activity_id": request.query.activity_id
                                                     }
                                                 }
