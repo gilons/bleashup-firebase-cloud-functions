@@ -26,22 +26,24 @@ exports.informOthers = functions.https.onRequest((request, response) => {
     //admin.database().ref('messages').push(request.query.key)
     admin.database().ref(`rooms/${request.query.activity_id}/${request.query.room_key}`).once('value', (snapshoot) => {
         let room = snapshoot.val()
+        console.error(room, "members")
         if (room !== null) {
             let message = request.query.message || "no caption added"
             let members = room.members
             members.map(element => {
                 let phone = request.query.sender_phone.replace(" ", "+")
                 let memberPhone = element.phone.replace("00", "+")
-                admin.database.ref(`activity/${activity_id}/participants`).once('value', mem => {
-                    if (mem.findIndex(ele => ele.phone.replace("00", "+") === memberPhone) >= 0) {
+                admin.database().ref(`activity/${request.query.activity_id}/participants`).once('value', mem => {
+                    console.error(mem.val())
+                    if (mem.val().findIndex(ele => ele.phone.replace("00", "+") === memberPhone) >= 0) {
                         if (memberPhone !== phone) {
                             admin.database().ref(`current_room/${memberPhone}`).once('value', snapshoot => {
                                 let current_room = snapshoot.val()
                                 if (current_room !== request.query.room_key) {
                                     admin.database().ref(`notifications_tokens/${memberPhone}`).once('value', snap => {
                                         let token = snap.val()
-                                        //console.log(token)
-                                        let ref = admin.database().ref(`new_message/${activity_id}/${memberPhone}/${request.query.room_key}`)
+                                        console.error(token)
+                                        let ref = admin.database().ref(`new_message/${request.query.activity_id}/${memberPhone}/${request.query.room_key}`)
                                         ref.once('value', snapValue => {
                                             if (snapValue.val() === null) {
                                                 ref.set({ new_messages: [request.query.message_key] })
@@ -89,9 +91,27 @@ exports.addParticipant = functions.https.onRequest((request, response) => {
     admin.database().ref(`activity/${event_id}/participants`).once('value', snap => {
         let newMembers = snap.val() !== null ? snap.val().concat(member) : member
         admin.database().ref(`activity/${event_id}/participants`).set(newMembers)
+        addMembers(event_id,committee,member)
     })
     return response.status(200).send("okooo")
 })
+
+exports.addMembers = functions.https.onRequest((request, response) => {
+    let member = JSON.parse(request.query.members)
+    let event_id = request.query.event_id
+    let committee_id = request.query.committee_id
+    addMembers(event_id,committee_id,member)
+    return response.status(200).send("okooo")
+})
+
+function addMembers(event_id,committee,member){
+    let ref = `rooms/${event_id}/${committee}/members`
+    admin.database().ref(ref).once('value', snap => {
+        let newMembers = snap.val() !== null ? snap.val().concat(member) : member
+        admin.database().ref(ref).set(newMembers)
+    })
+    return response.status(200).send("okooo")
+}
 
 exports.removeParticipant = functions.https.onRequest((request, response) => {
     let member = JSON.parse(request.query.members)
@@ -99,6 +119,22 @@ exports.removeParticipant = functions.https.onRequest((request, response) => {
     admin.database().ref(`activity/${event_id}/participants`).once('value', snap => {
         let newMembers = snap.val() !== null ? snap.val().filter(ele => member.indexOf(ele.phone) < 0) : []
         admin.database().ref(`activity/${event_id}/participants`).set(newMembers)
+        this.removeMembers(event_id,event_id,member)
     })
     return response.status(200).send("okooo")
 })
+exports.removeMembers = functions.https.onRequest((request, response) => {
+    let member = JSON.parse(request.query.members)
+    let event_id = request.query.event_id
+    let committee = request.query.committee_id
+    removeMembers(event_id,committee,member)
+    return response.status(200).send("okooo")
+})
+
+function removeMembers(event_id,committee,member){
+    let ref = `rooms/${event_id}/${committee}/members`
+    admin.database().ref(ref).once('value', snap => {
+        let newMembers = snap.val() !== null ? snap.val().filter(ele => member.indexOf(ele.phone) < 0) : []
+        admin.database().ref(ref).set(newMembers)
+    })
+}
